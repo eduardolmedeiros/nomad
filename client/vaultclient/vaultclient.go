@@ -399,6 +399,7 @@ func (c *vaultClient) renew(req *vaultClientRenewalRequest) error {
 
 	var renewalErr error
 	leaseDuration := req.increment
+
 	if req.isToken {
 		// Set the token in the API client to the one that needs renewal
 		c.client.SetToken(req.id)
@@ -434,14 +435,17 @@ func (c *vaultClient) renew(req *vaultClientRenewalRequest) error {
 	next := time.Now().Add(renewalDuration)
 
 	fatal := false
-	if renewalErr != nil &&
-		(strings.Contains(renewalErr.Error(), "lease not found or lease is not renewable") ||
-			strings.Contains(renewalErr.Error(), "invalid lease ID") ||
-			strings.Contains(renewalErr.Error(), "lease is not renewable") ||
-			strings.Contains(renewalErr.Error(), "token not found") ||
-			strings.Contains(renewalErr.Error(), "permission denied")) {
-		fatal = true
-	} else if renewalErr != nil {
+	if renewalErr != nil {
+		errMsg := renewalErr.Error()
+		if strings.Contains(errMsg, "lease not found or lease is not renewable") ||
+			strings.Contains(errMsg, "invalid lease ID") ||
+			strings.Contains(errMsg, "lease expired") ||
+			strings.Contains(errMsg, "lease is not renewable") ||
+			strings.Contains(errMsg, "token not found") ||
+			strings.Contains(errMsg, "permission denied") {
+			fatal = true
+		}
+	} else {
 		c.logger.Debug("renewal error details", "req.increment", req.increment, "lease_duration", leaseDuration, "renewal_duration", renewalDuration)
 		c.logger.Error("error during renewal of lease or token failed due to a non-fatal error; retrying",
 			"error", renewalErr, "period", next)
